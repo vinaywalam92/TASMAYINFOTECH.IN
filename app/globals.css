@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────────────────────── Design tokens ─────────────────────────
+   Colours are RGB triplets so Tailwind can apply opacity (bg-card/60).
+   Dark is the default "showroom" theme; wrap a page in .theme-light for clean product / checkout / account pages. */
+:root {
+  --surface: 6 8 14;
+  --card: 16 19 31;
+  --fg: 238 241 250;
+  --muted: 150 158 180;
+  --line: 255 255 255;
+  color-scheme: dark;
+}
+.theme-light {
+  --surface: 246 247 251;
+  --card: 255 255 255;
+  --fg: 14 18 30;
+  --muted: 82 90 112;
+  --line: 14 18 30;
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-surface font-sans text-fg antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  .theme-light {
+    @apply bg-surface text-fg;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-electric-400;
+    outline-style: solid;
+  }
+  ::selection {
+    background: rgb(79 124 255 / 0.35);
+  }
+  /* Visible, high-contrast native form controls */
+  select option { @apply bg-card text-fg; }
+}
+
+@layer components {
+  .container-x { @apply container; }
+  .section { @apply py-16 md:py-24; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.22em] text-cyan; }
+  .theme-light .eyebrow { @apply text-electric-600; }
+  .text-gradient {
+    background: linear-gradient(100deg, #8fb0ff 0%, #b79bff 45%, #5be3f5 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Glass surfaces */
+  .glass { @apply border border-line/10 bg-card/60 shadow-glass backdrop-blur-xl; }
+  .glass-solid { @apply border border-line/10 bg-card; }
+
+  /* Subtle gradient border that glows on hover */
+  .glow-border { position: relative; }
+  .glow-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, rgb(111 148 255 / .55), rgb(139 92 246 / .15) 40%, rgb(34 211 238 / .45));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity .35s ease;
+    pointer-events: none;
+  }
+  .glow-border:hover::before, .glow-border:focus-within::before { opacity: 1; }
+
+  /* Buttons */
+  .btn {
+    @apply relative inline-flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-2.5 text-sm font-semibold transition duration-300 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-glow hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0;
+    background: linear-gradient(110deg, #3a63e6 0%, #6f5cf0 55%, #8b5cf6 100%);
+  }
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / .28) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform .8s ease;
+  }
+  .btn-primary:hover::after { transform: translateX(120%); }
+  .btn-ghost { @apply btn border border-line/15 bg-line/5 text-fg hover:border-line/30 hover:bg-line/10; }
+  .btn-danger { @apply btn border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20; }
+  .btn-lg { @apply min-h-12 px-7 py-3 text-base; }
+  .btn-sm { @apply min-h-9 rounded-lg px-3.5 py-1.5 text-xs; }
+
+  /* Forms */
+  .label { @apply mb-1.5 block text-sm font-medium text-fg; }
+  .input {
+    @apply w-full rounded-xl border border-line/15 bg-line/5 px-4 py-3 text-sm text-fg placeholder:text-muted/80 transition focus:border-electric focus:outline-none focus:ring-2 focus:ring-electric/40 disabled:opacity-60;
+  }
+  .input[aria-invalid="true"] { @apply border-red-400 focus:ring-red-400/40; }
+  .field-error { @apply mt-1.5 text-xs text-red-400; }
+  .theme-light .field-error { @apply text-red-600; }
+  .hint { @apply mt-1.5 text-xs text-muted; }
+
+  .navlink {
+    @apply relative rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-fg;
+  }
+  .navlink::after {
+    content: "";
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #6f94ff, #8b5cf6, #22d3ee);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+  .navlink:hover::after, .navlink[aria-current="page"]::after, .navlink[aria-expanded="true"]::after { transform: scaleX(1); }
+
+  .msg-ok { @apply border-emerald-500/40 bg-emerald-500/10 text-emerald-300; }
+  .msg-err { @apply border-red-500/40 bg-red-500/10 text-red-300; }
+  .theme-light .msg-ok { @apply text-emerald-800; }
+  .theme-light .msg-err { @apply text-red-700; }
+
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line/15 bg-line/5 px-3 py-1 text-xs text-muted; }
+
+  /* Loading skeleton */
+  .skeleton { @apply relative overflow-hidden rounded-lg bg-line/10; }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / .08), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.6s infinite;
+  }
+  .theme-light .skeleton::after { background: linear-gradient(90deg, transparent, rgb(255 255 255 / .7), transparent); }
+
+  /* Ambient backdrops */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgb(var(--line) / .05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--line) / .05) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  }
+  .aurora {
+    background:
+      radial-gradient(40% 50% at 15% 20%, rgb(79 124 255 / .22), transparent 70%),
+      radial-gradient(35% 45% at 85% 15%, rgb(139 92 246 / .2), transparent 70%),
+      radial-gradient(30% 40% at 60% 90%, rgb(34 211 238 / .12), transparent 70%);
+  }
+
+  /* Page transition (applied by app/template.tsx) */
+  .page-enter { animation: page-in .45s cubic-bezier(.22, 1, .36, 1) both; }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -14px, 0) rotate(1.5deg); }
+}
+.animate-rise { animation: rise .9s cubic-bezier(.22, 1, .36, 1) both; }
+.animate-drift { animation: drift 7s ease-in-out infinite; }
+.animate-glow { animation: glow-pulse 3.2s ease-in-out infinite; }
+
+/* Hide scrollbars on horizontal carousels but keep scrolling */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Respect the OS "reduce motion" setting everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}

@@ -1,0 +1,8 @@
+import type { Metadata } from "next";
+import { PolicyPage } from "@/components/content/PolicyPage";
+
+export const metadata: Metadata = { title: "Terms & Conditions" };
+
+export default function Page() {
+  return <PolicyPage policyKey="terms" title="Terms & Conditions" />;
+}

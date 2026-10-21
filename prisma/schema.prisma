@@ -1,0 +1,537 @@
+// TASMAY INFOTECH — database schema
+// All monetary values are stored as integer paise (₹1 = 100 paise) to avoid floating-point errors.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  MANUAL
+}
+
+enum CouponType {
+  PERCENT
+  FLAT
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EnquiryStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  SPAM
+}
+
+enum QuoteKind {
+  BULK
+  QUOTE
+  SOURCING
+  TENDER
+  REQUIREMENTS
+}
+
+enum QuoteStatus {
+  NEW
+  IN_REVIEW
+  QUOTED
+  WON
+  LOST
+}
+
+// ───────────────────────── Identity ─────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  phone        String?
+  passwordHash String
+  role         Role      @default(CUSTOMER)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions       Session[]
+  resets         PasswordReset[]
+  addresses      Address[]
+  cart           Cart?
+  orders         Order[]
+  reviews        Review[]
+  wishlist       WishlistItem[]
+  auditLogs      AuditLog[]       @relation("AuditActor")
+  stockAdjusts   InventoryAdjustment[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  name      String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  pincode   String
+  country   String   @default("India")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ───────────────────────── Catalogue ─────────────────────────
+
+model Brand {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String    @unique
+  logoUrl   String?
+  website   String?
+  isActive  Boolean   @default(true)
+  isDemo    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryTree")
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  /** Key used by the UI to pick an illustration (laptops, printers, toner, …). */
+  iconKey     String?
+  createdAt   DateTime   @default(now())
+  products    Product[]
+
+  @@index([parentId])
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  sku               String   @unique
+  name              String
+  model             String?
+  description       String   @default("")
+  brandId           String?
+  brand             Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  categoryId        String
+  category          Category @relation(fields: [categoryId], references: [id])
+  /** Selling price in paise, as listed. Whether it includes GST is set by site setting `pricesIncludeGst`. */
+  pricePaise        Int
+  /** Optional MRP in paise (shown struck-through only when greater than price). */
+  mrpPaise          Int?
+  gstRate           Int      @default(18)
+  /** HSN/SAC code printed on GST invoices. Fill only with verified codes. */
+  hsnCode           String?
+  stock             Int      @default(0)
+  lowStockThreshold Int      @default(5)
+  /** Ordered label → value pairs, e.g. {"RAM":"16 GB"} */
+  specs             Json     @default("{}")
+  /** Flattened "Label: Value" strings used for attribute filtering. */
+  attributes        String[]
+  compatibility     String?
+  /** Only fill when verified with the manufacturer / supplier. */
+  warrantyInfo      String?
+  isActive          Boolean  @default(true)
+  isFeatured        Boolean  @default(false)
+  isDemo            Boolean  @default(false)
+  soldCount         Int      @default(0)
+  ratingAvg         Float    @default(0)
+  ratingCount       Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  images     ProductImage[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+  wishlist   WishlistItem[]
+  adjusts    InventoryAdjustment[]
+
+  @@index([categoryId, isActive])
+  @@index([brandId])
+  @@index([isFeatured])
+  @@index([soldCount])
+  @@index([createdAt])
+  @@index([name])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+
+  @@index([productId, sortOrder])
+}
+
+model InventoryAdjustment {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  delta     Int
+  reason    String
+  orderRef  String?
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+// ───────────────────────── Cart ─────────────────────────
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String?    @unique
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** Random token stored in an HTTP-only cookie for guest carts. */
+  token      String?    @unique
+  couponCode String?
+  pincode    String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  items      CartItem[]
+
+  @@index([updatedAt])
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+
+  @@unique([cartId, productId])
+}
+
+// ───────────────────────── Orders & payments ─────────────────────────
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email           String
+  phone           String
+  status          OrderStatus @default(PENDING_PAYMENT)
+  subtotalPaise   Int
+  discountPaise   Int         @default(0)
+  shippingPaise   Int         @default(0)
+  taxPaise        Int         @default(0)
+  totalPaise      Int
+  gstInclusive    Boolean     @default(true)
+  couponCode      String?
+  shippingAddress Json
+  billingAddress  Json
+  gstin           String?
+  notes           String?
+  /** Random capability token so guests can open their confirmation page / invoice. */
+  accessToken     String      @unique
+  stockRestocked  Boolean     @default(false)
+  confirmationEmailAt DateTime?
+  paidAt          DateTime?
+  cancelledAt     DateTime?
+  /** Policy-based delivery estimate captured at checkout (text, not a courier promise). */
+  estimatedDeliveryText String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items     OrderItem[]
+  payments  Payment[]
+  shipments Shipment[]
+  events    OrderEvent[]
+
+  @@index([userId, createdAt])
+  @@index([email])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name           String
+  sku            String
+  hsnCode        String?
+  /** Unit price as listed (incl. or excl. GST depending on Order.gstInclusive). */
+  unitPricePaise Int
+  quantity       Int
+  gstRate        Int
+  /** GST contained in lineTotalPaise. */
+  taxPaise       Int
+  /** Amount payable for this line after its coupon share, including GST. */
+  lineTotalPaise Int
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id        String       @id @default(cuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  amountPaise     Int
+  providerOrderId String?       @unique
+  providerPaymentId String?     @unique
+  /** card / upi / netbanking … as reported by the gateway */
+  gatewayMethod   String?
+  refundedPaise   Int           @default(0)
+  providerRefundId String?
+  failureReason   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+}
+
+model Shipment {
+  id             String    @id @default(cuid())
+  orderId        String
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier        String
+  trackingNumber String?
+  trackingUrl    String?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([orderId])
+}
+
+model Coupon {
+  id               String     @id @default(cuid())
+  code             String     @unique
+  description      String?
+  type             CouponType
+  /** PERCENT: 1–100. FLAT: paise. */
+  value            Int
+  minOrderPaise    Int        @default(0)
+  maxDiscountPaise Int?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  usageLimit       Int?
+  usedCount        Int        @default(0)
+  isActive         Boolean    @default(true)
+  showOnHome       Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+}
+
+// ───────────────────────── Engagement ─────────────────────────
+
+model Review {
+  id               String       @id @default(cuid())
+  productId        String
+  product          Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId           String?
+  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName       String
+  rating           Int
+  title            String?
+  body             String
+  status           ReviewStatus @default(PENDING)
+  verifiedPurchase Boolean      @default(false)
+  isDemo           Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+
+  @@unique([productId, userId])
+  @@index([productId, status])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  /** Double opt-in: only addresses with confirmedAt set may be mailed. */
+  confirmHash    String?
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  consentAt DateTime @default(now())
+  consentIp String?
+  createdAt DateTime @default(now())
+}
+
+// ───────────────────────── Enquiries ─────────────────────────
+
+model ContactEnquiry {
+  id          String        @id @default(cuid())
+  name        String
+  company     String?
+  email       String
+  phone       String
+  enquiryType String
+  message     String
+  productRef  String?
+  status      EnquiryStatus @default(NEW)
+  consentAt   DateTime
+  ip          String?
+  createdAt   DateTime      @default(now())
+
+  @@index([status, createdAt])
+}
+
+model BulkQuote {
+  id           String      @id @default(cuid())
+  kind         QuoteKind
+  name         String
+  company      String?
+  email        String
+  phone        String
+  organisation String?
+  gstin        String?
+  items        String
+  quantity     String?
+  budget       String?
+  timeline     String?
+  deliveryCity String?
+  notes        String?
+  status       QuoteStatus @default(NEW)
+  consentAt    DateTime
+  ip           String?
+  createdAt    DateTime    @default(now())
+
+  @@index([status, createdAt])
+}
+
+// ───────────────────────── Operations ─────────────────────────
+
+model ShippingRule {
+  id                String   @id @default(cuid())
+  name              String
+  /** PIN prefixes this rule covers, e.g. ["56","110"]. Empty array = default/fallback rule. */
+  pincodePrefixes   String[]
+  feePaise          Int      @default(0)
+  freeAbovePaise    Int?
+  /** Business days from dispatch to delivery (policy estimate, not live courier data). */
+  etaMinDays        Int      @default(2)
+  etaMaxDays        Int      @default(7)
+  /** false = PINs covered by this rule are NOT deliverable (use prefixes to block regions). */
+  serviceable       Boolean  @default(true)
+  note              String?
+  isActive          Boolean  @default(true)
+  /** Demo rules are hidden in production. */
+  isDemo            Boolean  @default(false)
+  /** Lower value wins when two rules match with equal prefix length. */
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+}
+
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
